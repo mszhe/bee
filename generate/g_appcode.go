@@ -23,7 +23,7 @@ import (
 	"regexp"
 	"strings"
 
-	beeLogger "github.com/beego/bee/logger"
+	"github.com/beego/bee/logger"
 	"github.com/beego/bee/logger/colors"
 	"github.com/beego/bee/utils"
 	_ "github.com/go-sql-driver/mysql"
@@ -258,9 +258,31 @@ func (tag *OrmTag) String() string {
 		return ""
 	}
 	if tag.Comment != "" {
-		return fmt.Sprintf("`orm:\"%s\" description:\"%s\"`", strings.Join(ormOptions, ";"), tag.Comment)
+		return fmt.Sprintf("`json:\"%s\" orm:\"%s\" description:\"%s\"`", StrFirstToUpper(tag.Column), strings.Join(ormOptions, ";"), tag.Comment)
 	}
-	return fmt.Sprintf("`orm:\"%s\"`", strings.Join(ormOptions, ";"))
+	return fmt.Sprintf("`json:\"%s\" orm:\"%s\"`", StrFirstToUpper(tag.Column), strings.Join(ormOptions, ";"))
+}
+
+/**
+ * 字符串首字母转化为大写 ios_bbbbbbbb -> iosBbbbbbbbb
+ */
+func StrFirstToUpper(str string) string {
+	temp := strings.Split(str, "_")
+	var upperStr string
+	for y := 0; y < len(temp); y++ {
+		vv := []rune(temp[y])
+		if y != 0 {
+			for i := 0; i < len(vv); i++ {
+				if i == 0 {
+					vv[i] -= 32
+					upperStr += string(vv[i]) // + string(vv[i+1])
+				} else {
+					upperStr += string(vv[i])
+				}
+			}
+		}
+	}
+	return temp[0] + upperStr
 }
 
 func GenerateAppcode(driver, connStr, level, tables, currpath string) {
@@ -449,7 +471,7 @@ func (mysqlDB *MysqlDB) GetColumns(db *sql.DB, table *Table, blackList map[strin
 		tag.Comment = columnComment
 		if table.Pk == colName {
 			col.Name = "Id"
-			col.Type = "int"
+			//col.Type = "int"
 			if extra == "auto_increment" {
 				tag.Auto = true
 			} else {
@@ -1033,7 +1055,7 @@ func Add{{modelName}}(m *{{modelName}}) (id int64, err error) {
 
 // Get{{modelName}}ById retrieves {{modelName}} by Id. Returns error if
 // Id doesn't exist
-func Get{{modelName}}ById(id int) (v *{{modelName}}, err error) {
+func Get{{modelName}}ById(id string) (v *{{modelName}}, err error) {
 	o := orm.NewOrm()
 	v = &{{modelName}}{Id: id}
 	if err = o.Read(v); err == nil {
@@ -1053,7 +1075,7 @@ func GetAll{{modelName}}(query map[string]string, fields []string, sortby []stri
 		// rewrite dot-notation to Object__Attribute
 		k = strings.Replace(k, ".", "__", -1)
 		if strings.Contains(k, "isnull") {
-			qs = qs.Filter(k, (v == "true" || v == "1"))
+			qs = qs.Filter(k, v == "true" || v == "1")
 		} else {
 			qs = qs.Filter(k, v)
 		}
@@ -1137,7 +1159,7 @@ func Update{{modelName}}ById(m *{{modelName}}) (err error) {
 
 // Delete{{modelName}} deletes {{modelName}} by Id and returns error if
 // the record to be deleted doesn't exist
-func Delete{{modelName}}(id int) (err error) {
+func Delete{{modelName}}(id string) (err error) {
 	o := orm.NewOrm()
 	v := {{modelName}}{Id: id}
 	// ascertain id exists in the database
@@ -1156,7 +1178,6 @@ import (
 	"{{pkgPath}}/models"
 	"encoding/json"
 	"errors"
-	"strconv"
 	"strings"
 
 	"github.com/astaxie/beego"
@@ -1207,8 +1228,8 @@ func (c *{{ctrlName}}Controller) Post() {
 // @router /:id [get]
 func (c *{{ctrlName}}Controller) GetOne() {
 	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	v, err := models.Get{{ctrlName}}ById(id)
+	//id, _ := strconv.Atoi(idStr)
+	v, err := models.Get{{ctrlName}}ById(idStr)
 	if err != nil {
 		c.Data["json"] = err.Error()
 	} else {
@@ -1290,8 +1311,8 @@ func (c *{{ctrlName}}Controller) GetAll() {
 // @router /:id [put]
 func (c *{{ctrlName}}Controller) Put() {
 	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	v := models.{{ctrlName}}{Id: id}
+	//id, _ := strconv.Atoi(idStr)
+	v := models.{{ctrlName}}{Id: idStr}
 	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
 		if err := models.Update{{ctrlName}}ById(&v); err == nil {
 			c.Data["json"] = "OK"
@@ -1313,8 +1334,8 @@ func (c *{{ctrlName}}Controller) Put() {
 // @router /:id [delete]
 func (c *{{ctrlName}}Controller) Delete() {
 	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	if err := models.Delete{{ctrlName}}(id); err == nil {
+	//id, _ := strconv.Atoi(idStr)
+	if err := models.Delete{{ctrlName}}(idStr); err == nil {
 		c.Data["json"] = "OK"
 	} else {
 		c.Data["json"] = err.Error()
