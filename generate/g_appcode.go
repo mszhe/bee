@@ -28,10 +28,12 @@ import (
 	"github.com/beego/bee/utils"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
+	"io"
+	"runtime"
 )
 
 const (
-	OModel byte = 1 << iota
+	OModel      byte = 1 << iota
 	OController
 	ORouter
 )
@@ -873,6 +875,48 @@ func writeControllerFiles(tables []*Table, cPath string, selectedTables map[stri
 		fmt.Fprintf(w, "\t%s%screate%s\t %s%s\n", "\x1b[32m", "\x1b[1m", "\x1b[21m", fpath, "\x1b[0m")
 		utils.FormatSourceCode(fpath)
 	}
+
+	SEP := string(filepath.Separator)
+	_, filename, _, _ := runtime.Caller(1)
+	p := getParentDirectory(filename) + SEP + "ext" + SEP
+	efp := p + "error.gtpl"
+	_, err := CopyFile(efp, cPath+SEP+"error.go")
+	if err != nil {
+		beeLogger.Log.Warnf("%s", err)
+	}
+	output := p + "output.gtpl"
+	_, err = CopyFile(output, cPath+SEP+"output.go")
+	if err != nil {
+		beeLogger.Log.Warnf("%s", err)
+	}
+}
+
+func getParentDirectory(dirctory string) string {
+	return substr(dirctory, 0, strings.LastIndex(dirctory, "/"))
+}
+
+func substr(s string, pos, length int) string {
+	runes := []rune(s)
+	l := pos + length
+	if l > len(runes) {
+		l = len(runes)
+	}
+	return string(runes[pos:l])
+}
+
+// file copy
+func CopyFile(srcName, dstName string) (written int64, err error) {
+	src, err := os.Open(srcName)
+	if err != nil {
+		return
+	}
+	defer src.Close()
+	dst, err := os.OpenFile(dstName, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return
+	}
+	defer dst.Close()
+	return io.Copy(dst, src)
 }
 
 // writeRouterFile generates router file
@@ -1177,7 +1221,6 @@ func Delete{{modelName}}(id string) (err error) {
 import (
 	"{{pkgPath}}/models"
 	"encoding/json"
-	"errors"
 	"strings"
 
 	"github.com/astaxie/beego"
@@ -1209,12 +1252,12 @@ func (c *{{ctrlName}}Controller) Post() {
 	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
 		if _, err := models.Add{{ctrlName}}(&v); err == nil {
 			c.Ctx.Output.SetStatus(201)
-			c.Data["json"] = v
+			c.Data["json"] = Ok(v)
 		} else {
-			c.Data["json"] = err.Error()
+			c.Data["json"] = Err(err)
 		}
 	} else {
-		c.Data["json"] = err.Error()
+		c.Data["json"] = Err(err)
 	}
 	c.ServeJSON()
 }
@@ -1231,9 +1274,9 @@ func (c *{{ctrlName}}Controller) GetOne() {
 	//id, _ := strconv.Atoi(idStr)
 	v, err := models.Get{{ctrlName}}ById(idStr)
 	if err != nil {
-		c.Data["json"] = err.Error()
+		c.Data["json"] = Err(err)
 	} else {
-		c.Data["json"] = v
+		c.Data["json"] = Ok(v)
 	}
 	c.ServeJSON()
 }
@@ -1283,7 +1326,7 @@ func (c *{{ctrlName}}Controller) GetAll() {
 		for _, cond := range strings.Split(v, ",") {
 			kv := strings.SplitN(cond, ":", 2)
 			if len(kv) != 2 {
-				c.Data["json"] = errors.New("Error: invalid query key/value pair")
+				c.Data["json"] = ErrStr("Error: invalid query key/value pair")
 				c.ServeJSON()
 				return
 			}
@@ -1294,9 +1337,9 @@ func (c *{{ctrlName}}Controller) GetAll() {
 
 	l, err := models.GetAll{{ctrlName}}(query, fields, sortby, order, offset, limit)
 	if err != nil {
-		c.Data["json"] = err.Error()
+		c.Data["json"] = Err(err)
 	} else {
-		c.Data["json"] = l
+		c.Data["json"] = Ok(l)
 	}
 	c.ServeJSON()
 }
@@ -1315,12 +1358,12 @@ func (c *{{ctrlName}}Controller) Put() {
 	v := models.{{ctrlName}}{Id: idStr}
 	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
 		if err := models.Update{{ctrlName}}ById(&v); err == nil {
-			c.Data["json"] = "OK"
+			c.Data["json"] = OkStr()
 		} else {
-			c.Data["json"] = err.Error()
+			c.Data["json"] = Err(err)
 		}
 	} else {
-		c.Data["json"] = err.Error()
+		c.Data["json"] = Err(err)
 	}
 	c.ServeJSON()
 }
@@ -1336,9 +1379,9 @@ func (c *{{ctrlName}}Controller) Delete() {
 	idStr := c.Ctx.Input.Param(":id")
 	//id, _ := strconv.Atoi(idStr)
 	if err := models.Delete{{ctrlName}}(idStr); err == nil {
-		c.Data["json"] = "OK"
+		c.Data["json"] = OkStr()
 	} else {
-		c.Data["json"] = err.Error()
+		c.Data["json"] = Err(err)
 	}
 	c.ServeJSON()
 }

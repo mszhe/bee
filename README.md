@@ -533,3 +533,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
+
+
+## ext
+bee api namespace/proj_name -conn="root:root@tcp(localhost:3306)/db_name"
+bee run -downdoc=true -gendoc=true
