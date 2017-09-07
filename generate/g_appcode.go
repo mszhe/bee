@@ -1406,6 +1406,9 @@ func init() {
 		{{nameSpaces}}
 	)
 	beego.AddNamespace(ns)
+
+	// other err handler
+	beego.ErrorController(&controllers.ErrorController{})
 }
 `
 	NamespaceTPL = `
